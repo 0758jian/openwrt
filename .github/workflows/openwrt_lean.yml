@@ -1,0 +1,127 @@
+#=================================================
+# Description: Build OpenWrt
+# Lisence: MIT
+# Author: 0758jian
+#=================================================
+
+name: Lean openwrt build
+
+on:
+#  push:
+#    branches:
+#      - master
+#  schedule:
+#    - cron: 0 3 * * 5
+  watch:
+    types: started
+
+env:
+  SSH_STATUS: true  
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.event.repository.owner.id == github.event.sender.id
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+        with:
+          ref: master
+
+      - name: Initialization Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          docker rmi `docker images -q`          
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /etc/mysql \
+            /etc/php
+          sudo -E apt-get -y purge \
+            azure-cli \
+            ghc* \
+            zulu* \
+            hhvm \
+            llvm* \
+            firefox \
+            google* \
+            dotnet* \
+            powershell \
+            openjdk* \
+            mysql* \
+            php*        
+          sudo -E apt-get update
+          sudo -E apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev patch unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex node-uglify gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx-ucl libelf-dev autoconf automake libtool autopoint device-tree-compiler libuv-dev
+          sudo -E apt-get -y autoremove --purge
+          sudo -E apt-get clean
+
+      - name: Clone lean code
+        env: 
+          REPO_URL: https://github.com/coolsnowwolf/lede
+          REPO_BRANCH: master
+        run: git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+
+      - name: Update feeds
+        working-directory: ./openwrt
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          sed -i '/Load Average/i\<tr><td width="33%"><%:CPU Temperature%></td><td><%=luci.sys.exec("cut -c1-2 /sys/class/thermal/thermal_zone0/temp")%></td></tr>' feeds/luci/modules/luci-mod-admin-full/luasrc/view/admin_status/index.htm
+
+      - name: SSH session
+        uses: csexton/debugger-action@master
+        if: env.SSH_STATUS == 'true'
+             
+#      - name: Merge config
+#        env:
+#          CONFIG_FILE: 'Raspberry3b.seed'
+#        run: |
+#          [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config        
+#          cd openwrt && make defconfig
+
+      - name: Download package
+        working-directory: ./openwrt
+        run: |
+          make download -j$(nproc)      
+          find dl -size -1024c -exec rm -f {} \;
+
+      - name: Build firmware
+        working-directory: ./openwrt
+        run: |          
+          make -j$(nproc) V=s
+
+      - name: Assemble Artifact
+        id: assemble_artifact
+        run: |
+          rm -rf ./artifact/
+          mkdir -p ./artifact/
+          find openwrt/bin/targets/ -name "*config.seed" | xargs -i mv -f {} ./artifact/
+          find openwrt/bin/targets/ -name "*factory*img*" | xargs -i mv -f {} ./artifact/
+          cp openwrt/.config ./artifact/
+          zip -r artifact.zip ./artifact/
+          release_tag="Openwrt_lean_$(date +%Y%m%d%H)"
+          echo "##[set-output name=release_tag;]$release_tag"
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.access_token }}
+        with:
+          tag_name: ${{ steps.assemble_artifact.outputs.release_tag }}
+          release_name: ${{ steps.assemble_artifact.outputs.release_tag }}
+          draft: false
+          prerelease: false
+          
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.access_token }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifact.zip
+          asset_name: ${{ steps.assemble_artifact.outputs.release_tag }}.zip
+          asset_content_type: application/zip    

@@ -1,0 +1,4 @@
+- 编译过程中进去ssh 来make menuconfig 再选择你的配置项后exit退出继续
+- luci Applications插件说明 [点我查看Luci说明](https://www.right.com.cn/forum/thread-344825-1-1.html)
+- 一般默认IP：192.168.1.1 默认密码：password
+- github action 中的ssh使用是 [debugger action](https://github.com/csexton/debugger-action)
