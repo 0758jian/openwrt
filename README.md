@@ -2,3 +2,4 @@
 - luci Applications插件说明 [点我查看Luci说明](https://www.right.com.cn/forum/thread-344825-1-1.html)
 - 一般默认IP：192.168.1.1 默认密码：password
 - github action 中的ssh使用是 [debugger action](https://github.com/csexton/debugger-action)
+- github action的虚拟机只有14G空间，编译个x86多点插件就爆空间不足了
