@@ -99,6 +99,7 @@ jobs:
           mkdir -p ./artifact/
           find openwrt/bin/targets/ -name "*config.seed" | xargs -i mv -f {} ./artifact/
           find openwrt/bin/targets/ -name "*factory*img*" | xargs -i mv -f {} ./artifact/
+          find openwrt/bin/targets/ -name "*combined*ext4*img*" | xargs -i mv -f {} ./artifact/
           cp openwrt/.config ./artifact/
           zip -r artifact.zip ./artifact/
           release_tag="Openwrt_lean_$(date +%Y%m%d%H)"
